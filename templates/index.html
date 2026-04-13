@@ -1,0 +1,737 @@
+{% extends "base.html" %}
+{% block title %}Analyze – Mocka AI{% endblock %}
+
+{% block extra_styles %}
+/* ── Layout ─────────────────────────────────────────── */
+.app-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: calc(100vh - 60px);
+  align-items: start;
+}
+@media(max-width:900px){ .app-layout { grid-template-columns:1fr; } }
+
+/* ── Left Panel ─────────────────────────────────────── */
+.left-panel { display:flex; flex-direction:column; gap:1rem; position:sticky; top:72px; }
+.panel-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 1.25rem;
+}
+
+/* File drop zones */
+.file-drop {
+  border: 2px dashed var(--border); border-radius: 10px;
+  padding: 1rem; text-align: center; transition: var(--transition);
+  cursor: pointer; position: relative; margin-bottom: 0.75rem;
+}
+.file-drop:hover,.file-drop.drag-over {
+  border-color: var(--accent); background: rgba(20,184,166,0.05);
+}
+.file-drop input[type="file"] {
+  position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;
+}
+.file-drop-icon  { font-size:1.4rem; margin-bottom:3px; }
+.file-drop-label { font-size:0.82rem; font-weight:700; }
+.file-drop-sub   { font-size:0.68rem; color:var(--text-sub); }
+.file-name       { font-size:0.72rem; color:var(--success); margin-top:4px; font-weight:600; display:none; }
+.file-name.show  { display:block; }
+
+/* Analyze button */
+.analyze-btn {
+  width:100%; padding:11px; border-radius:10px;
+  background:var(--accent-g); border:none; color:white;
+  font-family:'Inter',sans-serif; font-size:0.88rem; font-weight:700;
+  cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+  transition:var(--transition); box-shadow:0 3px 14px rgba(20,184,166,0.3);
+}
+.analyze-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 5px 20px rgba(20,184,166,0.45); }
+.analyze-btn:disabled { opacity:0.45; cursor:not-allowed; transform:none; }
+
+/* ── Score Card ─────────────────────────────────────── */
+.score-ring-wrap {
+  position:relative; width:110px; height:110px; margin:0 auto 0.75rem;
+}
+.score-ring-wrap svg { transform:rotate(-90deg); }
+.ring-bg   { fill:none; stroke:var(--border); stroke-width:9; }
+.ring-fill {
+  fill:none; stroke-width:9; stroke-linecap:round;
+  stroke:url(#sg); stroke-dasharray:339.29; stroke-dashoffset:339.29;
+  transition: stroke-dashoffset 1.2s ease;
+}
+.score-num {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.score-num .sv {
+  font-size:1.9rem; font-weight:800; font-family:'IBM Plex Mono',monospace;
+  background:var(--accent-g); -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent; background-clip:text;
+}
+.score-num .sl { font-size:0.6rem; color:var(--text-sub); }
+.score-label {
+  text-align:center; font-size:0.75rem; font-weight:700; margin-bottom:0.5rem;
+  padding:3px 10px; border-radius:20px; display:inline-block;
+}
+.label-high { background:rgba(16,185,129,0.12); color:var(--success); }
+.label-mid  { background:rgba(245,158,11,0.12);  color:var(--warning); }
+.label-low  { background:rgba(239,68,68,0.12);   color:var(--danger); }
+.score-reason { font-size:0.77rem; color:var(--text-sub); line-height:1.6; margin-top:0.5rem; }
+
+/* ── SKILL GAP BUTTON ───────────────────────────────── */
+.gap-cta-btn {
+  width:100%; padding:11px; border-radius:10px;
+  background: var(--surface2); border: 1px solid var(--accent);
+  color: var(--accent); font-family:'Inter',sans-serif;
+  font-size:0.85rem; font-weight:700;
+  cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+  transition:var(--transition); position:relative; overflow:hidden;
+}
+.gap-cta-btn::before {
+  content:''; position:absolute; inset:0;
+  background: var(--accent-g); opacity:0; transition:opacity 0.2s;
+}
+.gap-cta-btn:hover { color:white; }
+.gap-cta-btn:hover::before { opacity:1; }
+.gap-cta-btn span,.gap-cta-btn i { position:relative; z-index:1; }
+.gap-badge {
+  position:absolute; top:8px; right:8px;
+  background:var(--danger); color:white;
+  font-size:0.6rem; font-weight:800; padding:2px 6px; border-radius:10px; z-index:1;
+}
+
+/* ── SKILL GAP MODAL ────────────────────────────────── */
+.modal-backdrop {
+  position:fixed; inset:0; background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(4px); z-index:2000;
+  display:none; align-items:center; justify-content:center; padding:1.5rem;
+}
+.modal-backdrop.open { display:flex; }
+.modal-box {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:18px; width:100%; max-width:620px;
+  max-height:80vh; display:flex; flex-direction:column;
+  box-shadow:var(--shadow); animation:modalIn 0.25s ease;
+}
+@keyframes modalIn { from{transform:scale(0.95);opacity:0} to{transform:scale(1);opacity:1} }
+.modal-head {
+  padding:1.25rem 1.5rem; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+}
+.modal-head h3 { font-size:1rem; font-weight:800; display:flex; align-items:center; gap:8px; }
+.modal-close {
+  width:30px; height:30px; border-radius:7px;
+  background:var(--bg2); border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; color:var(--text-sub); transition:var(--transition);
+}
+.modal-close:hover { color:var(--danger); border-color:var(--danger); }
+.modal-body { padding:1.5rem; overflow-y:auto; flex:1; }
+
+.gap-section-title {
+  font-size:0.7rem; font-weight:800; text-transform:uppercase;
+  letter-spacing:0.08em; color:var(--accent); margin:1rem 0 0.5rem;
+  display:flex; align-items:center; gap:6px;
+}
+.gap-section-title:first-child { margin-top:0; }
+.gap-section-title::before {
+  content:''; width:3px; height:10px; border-radius:2px; background:var(--accent-g);
+}
+.gap-pill-wrap { display:flex; flex-wrap:wrap; gap:8px; }
+.gap-pill {
+  display:inline-flex; align-items:center; gap:5px;
+  background:var(--bg2); border:1px solid var(--border2);
+  color:var(--text-sub); padding:5px 12px; border-radius:7px;
+  font-size:0.78rem; font-weight:600; transition:var(--transition);
+}
+.gap-pill:hover { border-color:var(--accent); color:var(--text); }
+.gap-pill i { color:var(--warning); font-size:0.65rem; }
+.gap-none { font-size:0.82rem; color:var(--success); display:flex; align-items:center; gap:6px; }
+
+/* ── Right Panel ────────────────────────────────────── */
+.right-panel { display:flex; flex-direction:column; gap:1rem; }
+
+.empty-state {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:3rem; text-align:center; min-height:420px;
+}
+.empty-icon { font-size:2.75rem; margin-bottom:1rem; opacity:0.5; }
+.empty-state h3 { font-size:1.1rem; font-weight:800; margin-bottom:0.5rem; }
+.empty-state p { color:var(--text-sub); font-size:0.85rem; line-height:1.6; }
+
+.interview-area { display:none; flex-direction:column; gap:1rem; }
+.interview-area.show { display:flex; }
+
+/* ── Recording panel ────────────────────────────────── */
+.rec-panel {
+  background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden;
+}
+.rec-header {
+  padding:0.8rem 1.25rem;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid var(--border);
+}
+.rec-header-left { display:flex; align-items:center; gap:10px; font-size:0.82rem; font-weight:700; }
+.live-badge {
+  display:none; align-items:center; gap:5px;
+  background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35);
+  color:var(--danger); padding:2px 9px; border-radius:20px;
+  font-size:0.68rem; font-weight:800; letter-spacing:0.05em;
+}
+.live-badge.show { display:flex; }
+.live-dot { width:6px; height:6px; border-radius:50%; background:var(--danger); animation:pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+
+.rec-viewport { position:relative; background:#000; height:200px; }
+.rec-video { width:100%; height:100%; object-fit:cover; display:none; }
+.rec-placeholder {
+  height:100%; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  color:var(--text-dim); gap:6px; font-size:0.8rem;
+}
+.rec-placeholder i { font-size:2.25rem; opacity:0.3; }
+.rec-timer {
+  position:absolute; bottom:8px; left:10px;
+  background:rgba(0,0,0,0.65); color:white;
+  padding:2px 9px; border-radius:20px;
+  font-family:'IBM Plex Mono',monospace; font-size:0.78rem; display:none;
+}
+.rec-timer.show { display:block; }
+
+.rec-actions { padding:0.875rem 1.25rem; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+.btn-start-ans {
+  padding:9px 18px; border-radius:9px; border:none;
+  background:var(--accent-g); color:white;
+  font-family:'Inter',sans-serif; font-size:0.83rem; font-weight:700;
+  cursor:pointer; display:flex; align-items:center; gap:7px;
+  transition:var(--transition); box-shadow:0 3px 10px rgba(20,184,166,0.3);
+}
+.btn-start-ans:hover:not(:disabled) { transform:translateY(-1px); }
+.btn-start-ans:disabled { opacity:0.35; cursor:not-allowed; transform:none; }
+
+.btn-stop-ans {
+  padding:9px 18px; border-radius:9px;
+  background:rgba(239,68,68,0.1); color:var(--danger);
+  border:1px solid rgba(239,68,68,0.4);
+  font-family:'Inter',sans-serif; font-size:0.83rem; font-weight:700;
+  cursor:pointer; display:flex; align-items:center; gap:7px; transition:var(--transition);
+}
+.btn-stop-ans:hover:not(:disabled) { background:var(--danger); color:white; }
+.btn-stop-ans:disabled { opacity:0.25; cursor:not-allowed; }
+
+.cam-btn {
+  margin-left:auto; padding:7px 13px; border-radius:8px;
+  background:var(--bg2); border:1px solid var(--border);
+  color:var(--text-sub); font-family:'Inter',sans-serif;
+  font-size:0.76rem; font-weight:700; cursor:pointer;
+  display:flex; align-items:center; gap:6px; transition:var(--transition);
+}
+.cam-btn:hover   { border-color:var(--accent2); color:var(--accent2); }
+.cam-btn.cam-on  { background:rgba(239,68,68,0.08); color:var(--danger); border-color:var(--danger); }
+
+.playback-area { padding:0 1.25rem 0.875rem; display:none; flex-direction:column; gap:6px; }
+.playback-area.show { display:flex; }
+.playback-label { font-size:0.73rem; font-weight:700; color:var(--success); display:flex; align-items:center; gap:5px; }
+.playback-area video { width:100%; border-radius:9px; background:#000; max-height:180px; }
+.save-info { font-size:0.7rem; color:var(--text-sub); }
+
+/* ── Questions Panel ────────────────────────────────── */
+.q-panel { background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.q-tabs { display:flex; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none; }
+.q-tabs::-webkit-scrollbar { display:none; }
+.q-tab {
+  padding:9px 13px; font-size:0.73rem; font-weight:700;
+  color:var(--text-sub); cursor:pointer; white-space:nowrap;
+  border-bottom:2px solid transparent; transition:var(--transition); flex-shrink:0;
+  position:relative;
+}
+.q-tab:hover { color:var(--text); }
+.q-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.q-tab.done::after {
+  content:''; position:absolute; top:6px; right:3px;
+  width:5px; height:5px; border-radius:50%; background:var(--success);
+}
+.q-body { padding:1.4rem; }
+.q-type-badge {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:3px 9px; border-radius:20px; font-size:0.67rem; font-weight:800;
+  text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.75rem;
+}
+.badge-tech { background:rgba(20,184,166,0.12); color:var(--accent); }
+.badge-beh  { background:rgba(14,165,233,0.12);  color:var(--accent2); }
+.badge-sit  { background:rgba(16,185,129,0.12);  color:var(--success); }
+.q-text { font-size:0.975rem; font-weight:600; line-height:1.65; color:var(--text); }
+.q-nav {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0.8rem 1.25rem; border-top:1px solid var(--border); background:var(--bg2);
+}
+.q-prog { text-align:center; }
+.q-prog-text { font-size:0.73rem; color:var(--text-sub); font-weight:700; }
+.q-prog-bar  { height:3px; background:var(--border); border-radius:2px; width:90px; margin:4px auto 0; overflow:hidden; }
+.q-prog-fill { height:100%; border-radius:2px; background:var(--accent-g); transition:width 0.4s; }
+{% endblock %}
+
+{% block content %}
+
+<!-- SKILL GAP MODAL -->
+<div class="modal-backdrop" id="gapModal" onclick="closeGapModal(event)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>
+        <i class="fa fa-magnifying-glass-chart" style="color:var(--accent)"></i>
+        Skill Gap Analysis
+      </h3>
+      <div class="modal-close" onclick="document.getElementById('gapModal').classList.remove('open')">
+        <i class="fa fa-xmark"></i>
+      </div>
+    </div>
+    <div class="modal-body" id="gapModalBody">
+      <p style="color:var(--text-sub);font-size:0.85rem;">Run an analysis first to see your skill gaps.</p>
+    </div>
+  </div>
+</div>
+
+<div class="app-layout">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <div class="panel-card">
+      <div class="panel-title">Upload Documents</div>
+
+      <div class="file-drop" id="jdDrop">
+        <input type="file" id="jd_pdf" accept=".pdf" onchange="fileChosen('jd')">
+        <div class="file-drop-icon">📋</div>
+        <div class="file-drop-label">Job Description</div>
+        <div class="file-drop-sub">PDF only · click or drag</div>
+        <div class="file-name" id="jdName"></div>
+      </div>
+
+      <div class="file-drop" id="resumeDrop">
+        <input type="file" id="resume_pdf" accept=".pdf" onchange="fileChosen('resume')">
+        <div class="file-drop-icon">👤</div>
+        <div class="file-drop-label">Your Resume</div>
+        <div class="file-drop-sub">PDF only · click or drag</div>
+        <div class="file-name" id="resumeName"></div>
+      </div>
+
+      <button class="analyze-btn" id="analyzeBtn" onclick="runAnalysis()" disabled>
+        <i class="fa fa-wand-magic-sparkles"></i>
+        <span id="analyzeBtnText">Analyze Match</span>
+        <div class="spinner" id="analyzeSpinner" style="display:none"></div>
+      </button>
+    </div>
+
+    <!-- Score Card -->
+    <div class="panel-card" id="scoreCard" style="display:none; text-align:center;">
+      <div class="panel-title">Match Score</div>
+      <div class="score-ring-wrap">
+        <svg viewBox="0 0 120 120" width="110" height="110">
+          <defs>
+            <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%"   style="stop-color:#14B8A6"/>
+              <stop offset="100%" style="stop-color:#0EA5E9"/>
+            </linearGradient>
+          </defs>
+          <circle class="ring-bg" cx="60" cy="60" r="54"/>
+          <circle class="ring-fill" id="scoreRing" cx="60" cy="60" r="54"/>
+        </svg>
+        <div class="score-num">
+          <span class="sv" id="scoreVal">0</span>
+          <span class="sl">/100</span>
+        </div>
+      </div>
+      <div id="scoreLabelWrap" style="margin-bottom:0.5rem;"></div>
+      <div class="score-reason" id="scoreReason"></div>
+    </div>
+
+    <!-- Skill Gap CTA Button -->
+    <div id="gapCtaWrap" style="display:none;">
+      <button class="gap-cta-btn" onclick="openGapModal()">
+        <div class="gap-badge" id="gapBadge" style="display:none;">!</div>
+        <i class="fa fa-magnifying-glass-chart"></i>
+        <span>View Skill Gap Analysis</span>
+        <i class="fa fa-arrow-right" style="margin-left:auto;font-size:0.75rem;"></i>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🎯</div>
+      <h3>Ready when you are</h3>
+      <p>Upload a job description and your resume,<br>then hit <strong>Analyze Match</strong> to get your score,<br>skill gaps & personalized interview questions.</p>
+    </div>
+
+    <div class="interview-area" id="interviewArea">
+
+      <!-- Recording / Camera Panel -->
+      <div class="rec-panel">
+        <div class="rec-header">
+          <div class="rec-header-left">
+            <span>Practice Mode</span>
+            <div class="live-badge" id="liveBadge">
+              <div class="live-dot"></div> REC
+            </div>
+          </div>
+          <button class="cam-btn" id="camBtn" onclick="toggleCamera()">
+            <i class="fa fa-video"></i> Enable Camera
+          </button>
+        </div>
+
+        <div class="rec-viewport" id="recViewport">
+          <video class="rec-video" id="recVideo" autoplay playsinline muted></video>
+          <div class="rec-placeholder" id="recPlaceholder">
+            <i class="fa fa-video-slash"></i>
+            <span>Camera off — enable for realistic simulation</span>
+            <span style="font-size:0.68rem;opacity:0.5;">Audio+video recorded together when you answer</span>
+          </div>
+          <div class="rec-timer" id="recTimer">00:00</div>
+        </div>
+
+        <div class="rec-actions">
+          <button class="btn-start-ans" id="startAnsBtn" onclick="startAnswer()" disabled>
+            <i class="fa fa-circle-dot"></i> Start Answering
+          </button>
+          <button class="btn-stop-ans" id="stopAnsBtn" onclick="stopAnswer()" disabled>
+            <i class="fa fa-stop"></i> Stop
+          </button>
+        </div>
+
+        <div class="playback-area" id="playbackArea">
+          <div class="playback-label"><i class="fa fa-check-circle"></i> Recording saved</div>
+          <video id="playbackVideo" controls></video>
+          <div class="save-info" id="saveInfo"></div>
+        </div>
+      </div>
+
+      <!-- Questions Panel -->
+      <div class="q-panel">
+        <div class="q-tabs" id="qTabs"></div>
+        <div class="q-body" id="qBody"></div>
+        <div class="q-nav">
+          <button class="btn btn-outline btn-sm" id="prevBtn" onclick="navigate(-1)">
+            <i class="fa fa-chevron-left"></i> Prev
+          </button>
+          <div class="q-prog">
+            <div class="q-prog-text" id="qProgText">Q 1 / 10</div>
+            <div class="q-prog-bar"><div class="q-prog-fill" id="qProgFill" style="width:10%"></div></div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="nextBtn" onclick="navigate(1)">
+            Next <i class="fa fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let questions = [], currentQ = 0, chatId = null;
+let mediaRecorder = null, recordedChunks = [];
+let cameraStream = null, camEnabled = false;
+let timerInterval = null, timerSecs = 0;
+const answered = {};
+const CIRC = 339.29;
+let gapsText = '';
+
+function fileChosen(type) {
+  const el   = document.getElementById(type==='jd' ? 'jd_pdf' : 'resume_pdf');
+  const name = document.getElementById(type==='jd' ? 'jdName'  : 'resumeName');
+  if (el.files[0]) { name.textContent = '✓ ' + el.files[0].name; name.classList.add('show'); }
+  const jd  = document.getElementById('jd_pdf').files[0];
+  const res = document.getElementById('resume_pdf').files[0];
+  document.getElementById('analyzeBtn').disabled = !(jd && res);
+}
+['jdDrop','resumeDrop'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', () => el.classList.remove('drag-over'));
+});
+
+async function runAnalysis() {
+  const jdFile  = document.getElementById('jd_pdf').files[0];
+  const resFile = document.getElementById('resume_pdf').files[0];
+  if (!jdFile || !resFile) return;
+
+  const btn = document.getElementById('analyzeBtn');
+  const txt = document.getElementById('analyzeBtnText');
+  const spn = document.getElementById('analyzeSpinner');
+  btn.disabled = true; txt.textContent = 'Analyzing…'; spn.style.display = 'block';
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('interviewArea').classList.remove('show');
+  document.getElementById('scoreCard').style.display = 'none';
+  document.getElementById('gapCtaWrap').style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('jd_pdf', jdFile);
+  fd.append('resume_pdf', resFile);
+
+  try {
+    const res  = await fetch('/analyze', { method:'POST', body:fd });
+    const data = await res.json();
+    if (data.error) { alert('Error: ' + data.error); return; }
+    chatId   = data.chat_id;
+    gapsText = data.skill_gaps || '';
+    renderScore(data.score, data.relevance);
+    renderGapButton(gapsText);
+    renderQuestions(data.questions);
+  } catch(e) {
+    alert('Analysis failed. Check your Groq API key.\n' + e);
+  } finally {
+    btn.disabled = false; txt.textContent = 'Re-Analyze'; spn.style.display = 'none';
+  }
+}
+
+function renderScore(score, fullText) {
+  document.getElementById('scoreCard').style.display = 'block';
+  const offset = CIRC - (score / 100) * CIRC;
+  setTimeout(() => { document.getElementById('scoreRing').style.strokeDashoffset = offset; }, 80);
+  let count = 0;
+  const timer = setInterval(() => {
+    count = Math.min(count + Math.ceil(score / 40), score);
+    document.getElementById('scoreVal').textContent = count;
+    if (count >= score) clearInterval(timer);
+  }, 30);
+  let labelClass = score >= 75 ? 'label-high' : (score >= 50 ? 'label-mid' : 'label-low');
+  let labelText  = score >= 75 ? 'Strong Match' : (score >= 50 ? 'Good Match' : 'Needs Work');
+  document.getElementById('scoreLabelWrap').innerHTML =
+    `<div class="score-label ${labelClass}">${labelText}</div>`;
+  const lines  = fullText.split('\n').filter(l => l.trim());
+  const reason = lines.find(l => /reason/i.test(l)) || lines[1] || '';
+  document.getElementById('scoreReason').textContent = reason.replace(/^reason:\s*/i,'').trim();
+}
+
+function renderGapButton(gaps) {
+  document.getElementById('gapCtaWrap').style.display = 'block';
+  const hasMissing = gaps && !gaps.toLowerCase().includes('none identified');
+  document.getElementById('gapBadge').style.display = hasMissing ? 'block' : 'none';
+}
+
+function openGapModal() {
+  const body = document.getElementById('gapModalBody');
+  body.innerHTML = '';
+  if (!gapsText || gapsText.trim() === '') {
+    body.innerHTML = '<div class="gap-none"><i class="fa fa-check-circle"></i> No significant skill gaps detected!</div>';
+    document.getElementById('gapModal').classList.add('open');
+    return;
+  }
+  let pillWrap = null;
+  gapsText.split('\n').forEach(line => {
+    line = line.trim();
+    if (!line) return;
+    if (/^(technical gaps?|soft skill|experience gaps?)/i.test(line)) {
+      const sec = document.createElement('div');
+      sec.className = 'gap-section-title';
+      const icon = line.toLowerCase().includes('technical') ? 'fa-code' : 'fa-user-tie';
+      sec.innerHTML = `<i class="fa ${icon}"></i> ${line.replace(/[•\-*:]/g,'').trim()}`;
+      body.appendChild(sec);
+      pillWrap = document.createElement('div');
+      pillWrap.className = 'gap-pill-wrap';
+      body.appendChild(pillWrap);
+    } else if ((line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) && pillWrap) {
+      const text = line.replace(/^[•\-*]\s*/,'').trim();
+      if (!text) return;
+      if (text.toLowerCase() === 'none identified') {
+        const none = document.createElement('div');
+        none.className = 'gap-none';
+        none.innerHTML = '<i class="fa fa-check-circle"></i> None identified';
+        pillWrap.appendChild(none);
+      } else {
+        const pill = document.createElement('div');
+        pill.className = 'gap-pill';
+        pill.innerHTML = `<i class="fa fa-circle-exclamation"></i> ${text}`;
+        pillWrap.appendChild(pill);
+      }
+    }
+  });
+  if (!body.children.length) {
+    body.innerHTML = '<div class="gap-none"><i class="fa fa-check-circle"></i> No significant gaps found.</div>';
+  }
+  document.getElementById('gapModal').classList.add('open');
+}
+
+function closeGapModal(e) {
+  if (e.target === document.getElementById('gapModal'))
+    document.getElementById('gapModal').classList.remove('open');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('gapModal').classList.remove('open');
+});
+
+function renderQuestions(qs) {
+  questions = qs; currentQ = 0;
+  const tabs = document.getElementById('qTabs');
+  tabs.innerHTML = '';
+  qs.forEach((_, i) => {
+    const t = document.createElement('div');
+    t.className = 'q-tab' + (i===0 ? ' active':'');
+    t.id = 'tab'+i; t.textContent = 'Q'+(i+1);
+    t.onclick = () => goTo(i);
+    tabs.appendChild(t);
+  });
+  document.getElementById('interviewArea').classList.add('show');
+  document.getElementById('startAnsBtn').disabled = false;
+  renderQ(0);
+}
+
+function typeInfo(i) {
+  if (i < 5)  return ['Technical',   'badge-tech', 'fa-code'];
+  if (i < 8)  return ['Behavioral',  'badge-beh',  'fa-comments'];
+  return              ['Situational', 'badge-sit',  'fa-lightbulb'];
+}
+
+function renderQ(idx) {
+  currentQ = idx;
+  document.querySelectorAll('.q-tab').forEach((t,i) => t.classList.toggle('active', i===idx));
+  const tab = document.getElementById('tab'+idx);
+  if (tab) tab.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
+  const [label, cls, icon] = typeInfo(idx);
+  const text = questions[idx].replace(/^\d+[\.\)]\s*/,'');
+  document.getElementById('qBody').innerHTML = `
+    <div class="q-type-badge ${cls}"><i class="fa ${icon}"></i>${label}</div>
+    <div class="q-text">${text}</div>
+  `;
+  const pct = ((idx+1)/questions.length*100).toFixed(0);
+  document.getElementById('qProgText').textContent = `Q ${idx+1} / ${questions.length}`;
+  document.getElementById('qProgFill').style.width = pct+'%';
+  document.getElementById('prevBtn').disabled = idx===0;
+  document.getElementById('nextBtn').disabled = idx===questions.length-1;
+  const area = document.getElementById('playbackArea');
+  if (answered[idx]) {
+    document.getElementById('playbackVideo').src = answered[idx].url;
+    document.getElementById('saveInfo').textContent = 'Saved: ' + answered[idx].filename;
+    area.classList.add('show');
+  } else {
+    area.classList.remove('show');
+    document.getElementById('playbackVideo').src = '';
+  }
+}
+
+function navigate(dir) { goTo(currentQ+dir); }
+function goTo(idx) {
+  if (idx<0 || idx>=questions.length) return;
+  if (mediaRecorder && mediaRecorder.state==='recording') stopAnswer();
+  renderQ(idx);
+}
+
+async function toggleCamera() {
+  const btn = document.getElementById('camBtn');
+  const vid = document.getElementById('recVideo');
+  if (camEnabled) {
+    if (cameraStream) { cameraStream.getTracks().forEach(t=>t.stop()); cameraStream=null; }
+    vid.style.display='none'; vid.srcObject=null;
+    document.getElementById('recPlaceholder').style.display='flex';
+    btn.innerHTML='<i class="fa fa-video"></i> Enable Camera';
+    btn.classList.remove('cam-on'); camEnabled=false;
+  } else {
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+      vid.srcObject=cameraStream; vid.style.display='block';
+      document.getElementById('recPlaceholder').style.display='none';
+      btn.innerHTML='<i class="fa fa-video-slash"></i> Camera On';
+      btn.classList.add('cam-on'); camEnabled=true;
+    } catch(e) { alert('Camera access denied: '+e.message); }
+  }
+}
+
+async function startAnswer() {
+  if (mediaRecorder && mediaRecorder.state==='recording') return;
+  try {
+    const micStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    let stream;
+    if (camEnabled && cameraStream) {
+      stream = new MediaStream([...cameraStream.getVideoTracks(), ...micStream.getAudioTracks()]);
+      document.getElementById('recVideo').srcObject = stream;
+    } else {
+      try {
+        const cs = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+        cameraStream=cs; camEnabled=true;
+        stream = new MediaStream([...cs.getVideoTracks(), ...micStream.getAudioTracks()]);
+        const vid = document.getElementById('recVideo');
+        vid.srcObject=stream; vid.style.display='block';
+        document.getElementById('recPlaceholder').style.display='none';
+        document.getElementById('camBtn').innerHTML='<i class="fa fa-video-slash"></i> Camera On';
+        document.getElementById('camBtn').classList.add('cam-on');
+      } catch(_) { stream = micStream; }
+    }
+    recordedChunks = [];
+    const mime = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','audio/webm']
+      .find(m => MediaRecorder.isTypeSupported(m)) || '';
+    mediaRecorder = new MediaRecorder(stream, mime ? {mimeType:mime} : {});
+    mediaRecorder.ondataavailable = e => { if(e.data.size>0) recordedChunks.push(e.data); };
+    mediaRecorder.start(100);
+    document.getElementById('startAnsBtn').disabled = true;
+    document.getElementById('stopAnsBtn').disabled  = false;
+    document.getElementById('liveBadge').classList.add('show');
+    document.getElementById('playbackArea').classList.remove('show');
+    startTimer();
+  } catch(e) { alert('Microphone denied: '+e.message); }
+}
+
+function stopAnswer() {
+  if (!mediaRecorder || mediaRecorder.state==='inactive') return;
+  mediaRecorder.stop();
+  mediaRecorder.onstop = async () => {
+    stopTimer();
+    const hasVid = recordedChunks.length>0 && mediaRecorder.stream &&
+                   mediaRecorder.stream.getVideoTracks().length>0;
+    const blob = new Blob(recordedChunks, { type: hasVid?'video/webm':'audio/webm' });
+    const url  = URL.createObjectURL(blob);
+    document.getElementById('playbackVideo').src = url;
+    document.getElementById('playbackArea').classList.add('show');
+    if (camEnabled && cameraStream) document.getElementById('recVideo').srcObject=cameraStream;
+    document.getElementById('startAnsBtn').disabled = false;
+    document.getElementById('stopAnsBtn').disabled  = true;
+    document.getElementById('liveBadge').classList.remove('show');
+    const tab = document.getElementById('tab'+currentQ);
+    if (tab) tab.classList.add('done');
+    const fd = new FormData();
+    fd.append('audio', blob, `q${currentQ}.webm`);
+    fd.append('question_index', currentQ);
+    fd.append('chat_id', chatId||'session');
+    try {
+      const r = await fetch('/upload_audio',{method:'POST',body:fd});
+      const d = await r.json();
+      answered[currentQ] = { url, filename: d.filename||`q${currentQ}.webm` };
+      document.getElementById('saveInfo').textContent = 'Saved: '+(d.filename||`q${currentQ}.webm`);
+    } catch(e) {
+      answered[currentQ] = { url, filename:`q${currentQ}.webm` };
+      document.getElementById('saveInfo').textContent = 'Saved locally (upload failed)';
+    }
+  };
+}
+
+function startTimer() {
+  timerSecs=0;
+  document.getElementById('recTimer').classList.add('show');
+  timerInterval = setInterval(()=>{
+    timerSecs++;
+    const m=String(Math.floor(timerSecs/60)).padStart(2,'0');
+    const s=String(timerSecs%60).padStart(2,'0');
+    document.getElementById('recTimer').textContent=m+':'+s;
+  },1000);
+}
+function stopTimer() {
+  clearInterval(timerInterval);
+  document.getElementById('recTimer').classList.remove('show');
+}
+
+window.addEventListener('beforeunload',()=>{
+  if(cameraStream) cameraStream.getTracks().forEach(t=>t.stop());
+});
+</script>
+{% endblock %}

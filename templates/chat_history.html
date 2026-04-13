@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}History – Mocka AI{% endblock %}
+
+{% block extra_styles %}
+.history-page { padding: 2rem; max-width: 1000px; margin: 0 auto; }
+.history-header { margin-bottom: 2rem; }
+.history-header h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 0.25rem; }
+.history-header p  { color: var(--text-sub); font-size: 0.9rem; }
+
+/* Filter bar */
+.filter-bar {
+  display: flex; gap: 10px; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center;
+}
+.filter-input {
+  flex: 1; min-width: 200px; padding: 9px 14px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); font-family: 'Syne', sans-serif; font-size: 0.875rem;
+  transition: var(--transition);
+}
+.filter-input:focus { outline: none; border-color: var(--accent); }
+.filter-input::placeholder { color: var(--text-sub); }
+.sort-btn {
+  padding: 9px 16px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  color: var(--text-sub); font-family: 'Syne', sans-serif; font-size: 0.8rem; font-weight: 700;
+  cursor: pointer; transition: var(--transition);
+}
+.sort-btn.active, .sort-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Session cards */
+.session-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; margin-bottom: 1rem;
+  overflow: hidden; transition: var(--transition);
+}
+.session-card:hover { border-color: rgba(124,58,237,0.4); }
+.session-card-header {
+  padding: 1.25rem 1.5rem;
+  display: flex; align-items: center; gap: 1rem; cursor: pointer;
+}
+.session-num {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  background: rgba(124,58,237,0.15); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Space Mono', monospace; font-size: 0.75rem; font-weight: 700;
+}
+.session-main { flex: 1; min-width: 0; }
+.session-files {
+  font-size: 0.875rem; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 3px;
+}
+.session-date { font-size: 0.75rem; color: var(--text-sub); }
+.session-badge {
+  padding: 5px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 800;
+  font-family: 'Space Mono', monospace; flex-shrink: 0;
+}
+.badge-high   { background: rgba(16,185,129,0.15); color: var(--success); }
+.badge-mid    { background: rgba(245,158,11,0.15);  color: var(--warning); }
+.badge-low    { background: rgba(239,68,68,0.15);   color: var(--danger); }
+.badge-na     { background: var(--bg2); color: var(--text-sub); }
+
+.chevron { font-size: 0.8rem; color: var(--text-sub); transition: transform 0.25s; flex-shrink: 0; }
+.chevron.open { transform: rotate(90deg); }
+
+/* Expanded body */
+.session-body { display: none; border-top: 1px solid var(--border); }
+.session-body.open { display: block; }
+
+.detail-tabs {
+  display: flex; border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+.detail-tab {
+  padding: 10px 18px; font-size: 0.78rem; font-weight: 700;
+  color: var(--text-sub); cursor: pointer; border-bottom: 2px solid transparent;
+  transition: var(--transition);
+}
+.detail-tab:hover { color: var(--text); }
+.detail-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.detail-pane { padding: 1.5rem; display: none; }
+.detail-pane.active { display: block; }
+
+/* Relevance detail */
+.relevance-display {
+  display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap;
+}
+.big-score {
+  font-size: 3.5rem; font-weight: 800; font-family: 'Space Mono', monospace;
+  background: var(--accent-g); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; line-height: 1;
+}
+.score-detail-bar {
+  flex: 1; min-width: 120px;
+}
+.sdb-track {
+  height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;
+  margin-bottom: 6px;
+}
+.sdb-fill {
+  height: 100%; border-radius: 4px; background: var(--accent-g);
+}
+.reason-text { font-size: 0.85rem; color: var(--text-sub); line-height: 1.7; }
+
+/* Gaps */
+.gap-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25);
+  color: var(--warning); padding: 4px 10px; border-radius: 6px;
+  font-size: 0.78rem; font-weight: 600; margin: 3px;
+}
+
+/* Questions list */
+.q-list-item {
+  padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.875rem;
+  display: flex; gap: 10px;
+}
+.q-list-item:last-child { border-bottom: none; }
+.q-list-num {
+  font-size: 0.7rem; font-weight: 800; color: var(--accent); flex-shrink: 0;
+  margin-top: 2px; width: 24px;
+}
+
+/* Empty */
+.empty-history { text-align: center; padding: 4rem 2rem; color: var(--text-sub); }
+.empty-history .icon { font-size: 3rem; margin-bottom: 1rem; }
+.empty-history a { color: var(--accent); font-weight: 700; }
+{% endblock %}
+
+{% block content %}
+<div class="history-page">
+  <div class="history-header">
+    <h1>Analysis <span class="gradient-text">History</span></h1>
+    <p>All your past sessions — scores, gaps, and generated questions.</p>
+  </div>
+
+  {% if chats %}
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <input type="text" class="filter-input" id="searchInput"
+           placeholder="🔍  Search by filename…" oninput="filterCards()">
+    <span style="font-size:0.78rem;color:var(--text-sub);font-weight:700;">{{ chats|length }} session{{ 's' if chats|length != 1 }}</span>
+  </div>
+
+  <div id="cardsContainer">
+  {% for chat in chats %}
+    {% set score_val = namespace(v=0) %}
+    {% if chat.relevance_score %}
+      {% for w in chat.relevance_score.split() %}
+        {% if w.isdigit() and score_val.v == 0 %}{% set score_val.v = w|int %}{% endif %}
+      {% endfor %}
+    {% endif %}
+    {% set s = score_val.v %}
+    {% set badge_class = 'badge-high' if s >= 75 else ('badge-mid' if s >= 50 else ('badge-low' if s > 0 else 'badge-na')) %}
+
+    <div class="session-card" data-search="{{ chat.jd_filename }} {{ chat.resume_filename }}">
+      <div class="session-card-header" onclick="toggleCard({{ loop.index }})">
+        <div class="session-num">#{{ loop.index }}</div>
+        <div class="session-main">
+          <div class="session-files">
+            📋 {{ chat.jd_filename or 'JD' }} &nbsp;·&nbsp; 👤 {{ chat.resume_filename or 'Resume' }}
+          </div>
+          <div class="session-date">
+            <i class="fa fa-clock" style="margin-right:4px"></i>
+            {{ chat.created_at.strftime('%d %b %Y at %H:%M') if chat.created_at else 'N/A' }}
+          </div>
+        </div>
+        <div class="session-badge {{ badge_class }}">{{ s if s > 0 else 'N/A' }}{% if s > 0 %}/100{% endif %}</div>
+        <i class="fa fa-chevron-right chevron" id="chevron{{ loop.index }}"></i>
+      </div>
+
+      <div class="session-body" id="body{{ loop.index }}">
+        <!-- Tabs -->
+        <div class="detail-tabs">
+          <div class="detail-tab active" onclick="showTab({{ loop.index }}, 'relevance', this)">
+            <i class="fa fa-chart-pie"></i> Score
+          </div>
+          <div class="detail-tab" onclick="showTab({{ loop.index }}, 'gaps', this)">
+            <i class="fa fa-triangle-exclamation"></i> Skill Gaps
+          </div>
+          <div class="detail-tab" onclick="showTab({{ loop.index }}, 'questions', this)">
+            <i class="fa fa-comments"></i> Questions
+          </div>
+        </div>
+
+        <!-- Relevance pane -->
+        <div class="detail-pane active" id="pane-{{ loop.index }}-relevance">
+          <div class="relevance-display">
+            <div class="big-score">{{ s }}</div>
+            <div class="score-detail-bar">
+              <div class="sdb-track">
+                <div class="sdb-fill" style="width:{{ s }}%"></div>
+              </div>
+              <div style="font-size:0.75rem;color:var(--text-sub);font-weight:700;">
+                {% if s >= 75 %}Strong Match{% elif s >= 50 %}Moderate Match{% elif s > 0 %}Weak Match{% else %}N/A{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="reason-text">
+            {{ chat.relevance_score or 'No details available.' }}
+          </div>
+        </div>
+
+        <!-- Gaps pane -->
+        <div class="detail-pane" id="pane-{{ loop.index }}-gaps">
+          {% if chat.skill_gaps %}
+            {% set gap_lines = chat.skill_gaps.split('\n') %}
+            {% for line in gap_lines %}
+              {% if line.strip() %}
+                {% if 'gap' in line.lower() or 'technical' in line.lower() or 'soft' in line.lower() %}
+                  <p style="font-size:0.75rem;font-weight:800;color:var(--accent2);text-transform:uppercase;letter-spacing:0.06em;margin:0.75rem 0 0.5rem;">
+                    {{ line.replace('•','').replace('-','').strip() }}
+                  </p>
+                {% else %}
+                  <span class="gap-pill">
+                    <i class="fa fa-circle-exclamation" style="font-size:0.65rem"></i>
+                    {{ line.replace('•','').replace('-','').strip() }}
+                  </span>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            <p style="color:var(--text-sub);font-size:0.875rem;">No skill gap data for this session.</p>
+          {% endif %}
+        </div>
+
+        <!-- Questions pane -->
+        <div class="detail-pane" id="pane-{{ loop.index }}-questions">
+          {% if chat.questions %}
+            {% set qs = chat.questions.split('\n') %}
+            {% for q in qs %}
+              {% if q.strip() and '?' in q %}
+              <div class="q-list-item">
+                <div class="q-list-num">Q{{ loop.index }}</div>
+                <div>{{ q.strip() | replace(loop.index ~ '.', '') | replace(loop.index ~ ')', '') }}</div>
+              </div>
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            <p style="color:var(--text-sub);font-size:0.875rem;">No questions saved for this session.</p>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-history">
+    <div class="icon">📭</div>
+    <p style="font-size:1rem;font-weight:700;margin-bottom:0.5rem;">No sessions yet</p>
+    <p>Run your first analysis to see it here.<br>
+    <a href="{{ url_for('index') }}">Start analyzing →</a></p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function toggleCard(idx) {
+  const body    = document.getElementById('body' + idx);
+  const chevron = document.getElementById('chevron' + idx);
+  const isOpen  = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  chevron.classList.toggle('open', !isOpen);
+}
+
+function showTab(cardIdx, tabName, clickedEl) {
+  // Hide all panes for this card
+  ['relevance','gaps','questions'].forEach(t => {
+    const pane = document.getElementById(`pane-${cardIdx}-${t}`);
+    if (pane) pane.classList.remove('active');
+  });
+  // Deactivate all tabs in this card
+  clickedEl.closest('.detail-tabs').querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+
+  document.getElementById(`pane-${cardIdx}-${tabName}`).classList.add('active');
+  clickedEl.classList.add('active');
+}
+
+function filterCards() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('.session-card').forEach(card => {
+    const text = card.dataset.search.toLowerCase();
+    card.style.display = text.includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,8 @@
+flask
+flask-cors
+python-dotenv
+groq
+pymupdf
+mysql-connector-python
+werkzeug
+requests

@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – Mocka AI{% endblock %}
+
+{% block extra_styles %}
+.dash-page { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+
+/* Header */
+.dash-header { margin-bottom: 2rem; }
+.dash-header h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 0.25rem; }
+.dash-header p  { color: var(--text-sub); font-size: 0.9rem; }
+.greeting-name  { background: var(--accent-g); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+
+/* Stats grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem; margin-bottom: 2rem;
+}
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 1.5rem;
+  display: flex; align-items: center; gap: 1rem;
+  transition: var(--transition);
+}
+.stat-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow); }
+.stat-icon {
+  width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 22px;
+}
+.stat-icon.purple { background: rgba(124,58,237,0.15); color: var(--accent); }
+.stat-icon.cyan   { background: rgba(6,182,212,0.15);  color: var(--accent2); }
+.stat-icon.green  { background: rgba(16,185,129,0.15); color: var(--success); }
+.stat-icon.amber  { background: rgba(245,158,11,0.15); color: var(--warning); }
+.stat-info {}
+.stat-val  { font-size: 2rem; font-weight: 800; font-family: 'Space Mono', monospace; line-height: 1; }
+.stat-lbl  { font-size: 0.78rem; color: var(--text-sub); font-weight: 600; margin-top: 2px; }
+
+/* Score bar visual */
+.score-bar-wrap { margin-top: 8px; }
+.score-bar-track {
+  height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; width: 120px;
+}
+.score-bar-fill {
+  height: 100%; border-radius: 3px;
+  background: var(--accent-g); transition: width 1s ease;
+}
+
+/* Two-col layout */
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.5rem;
+}
+@media(max-width:900px) { .dash-grid { grid-template-columns: 1fr; } }
+
+/* Recent sessions */
+.section-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; overflow: hidden;
+}
+.section-head {
+  padding: 1.25rem 1.5rem;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.section-head h3 { font-size: 0.9rem; font-weight: 800; }
+.section-head a  { font-size: 0.78rem; color: var(--accent); font-weight: 700; }
+.section-head a:hover { text-decoration: underline; }
+
+.session-item {
+  padding: 1rem 1.5rem;
+  display: flex; align-items: center; gap: 1rem;
+  border-bottom: 1px solid var(--border);
+  transition: var(--transition);
+}
+.session-item:last-child { border-bottom: none; }
+.session-item:hover { background: var(--bg2); }
+.session-thumb {
+  width: 42px; height: 42px; border-radius: 10px; flex-shrink: 0;
+  background: rgba(124,58,237,0.15);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.session-info { flex: 1; min-width: 0; }
+.session-title {
+  font-size: 0.875rem; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.session-meta { font-size: 0.75rem; color: var(--text-sub); margin-top: 2px; }
+.session-score {
+  font-size: 0.85rem; font-weight: 800;
+  font-family: 'Space Mono', monospace;
+  padding: 4px 10px; border-radius: 8px;
+}
+.score-high   { background: rgba(16,185,129,0.15); color: var(--success); }
+.score-mid    { background: rgba(245,158,11,0.15); color: var(--warning); }
+.score-low    { background: rgba(239,68,68,0.15);  color: var(--danger); }
+
+/* Tips panel */
+.tip-item {
+  padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+  display: flex; gap: 12px; align-items: flex-start;
+}
+.tip-item:last-child { border-bottom: none; }
+.tip-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 1px; }
+.tip-title { font-size: 0.82rem; font-weight: 700; margin-bottom: 2px; }
+.tip-text  { font-size: 0.78rem; color: var(--text-sub); line-height: 1.5; }
+
+/* Empty state */
+.empty-sessions {
+  padding: 3rem; text-align: center; color: var(--text-sub);
+}
+.empty-sessions .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+.empty-sessions p { font-size: 0.875rem; }
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+
+  <!-- Header -->
+  <div class="dash-header">
+    <h1>Hey, <span class="greeting-name">{{ username }}</span> 👋</h1>
+    <p>Here's a quick look at your interview prep progress.</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon purple"><i class="fa fa-file-magnifying-glass"></i></div>
+      <div class="stat-info">
+        <div class="stat-val">{{ stats.total_analyses }}</div>
+        <div class="stat-lbl">Total Analyses</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon cyan"><i class="fa fa-chart-line"></i></div>
+      <div class="stat-info">
+        <div class="stat-val">{{ stats.avg_score }}</div>
+        <div class="stat-lbl">Avg. Match Score</div>
+        <div class="score-bar-wrap">
+          <div class="score-bar-track">
+            <div class="score-bar-fill" style="width:{{ stats.avg_score }}%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green"><i class="fa fa-trophy"></i></div>
+      <div class="stat-info">
+        <div class="stat-val">{{ stats.best_score }}</div>
+        <div class="stat-lbl">Best Score</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon amber"><i class="fa fa-microphone"></i></div>
+      <div class="stat-info">
+        <div class="stat-val">∞</div>
+        <div class="stat-lbl">Practice Sessions</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="dash-grid">
+
+    <!-- Recent Sessions -->
+    <div class="section-card">
+      <div class="section-head">
+        <h3><i class="fa fa-clock-rotate-left" style="margin-right:8px;color:var(--accent)"></i>Recent Sessions</h3>
+        <a href="{{ url_for('history') }}">View all →</a>
+      </div>
+
+      {% if chats %}
+        {% for chat in chats[:6] %}
+        {% set score_val = namespace(v=0) %}
+        {% if chat.relevance_score %}
+          {% set parts = chat.relevance_score.split() %}
+          {% for part in parts %}
+            {% if part.isdigit() and score_val.v == 0 %}{% set score_val.v = part|int %}{% endif %}
+          {% endfor %}
+        {% endif %}
+
+        <div class="session-item">
+          <div class="session-thumb">📄</div>
+          <div class="session-info">
+            <div class="session-title">{{ chat.jd_filename or 'Job Description' }}</div>
+            <div class="session-meta">
+              Resume: {{ chat.resume_filename or 'N/A' }} &nbsp;·&nbsp;
+              {{ chat.created_at.strftime('%d %b %Y, %H:%M') if chat.created_at else 'N/A' }}
+            </div>
+          </div>
+          <div class="session-score {% if score_val.v >= 75 %}score-high{% elif score_val.v >= 50 %}score-mid{% else %}score-low{% endif %}">
+            {{ score_val.v }}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-sessions">
+          <div class="icon">📭</div>
+          <p>No sessions yet.<br>
+          <a href="{{ url_for('index') }}" style="color:var(--accent);font-weight:700;">Run your first analysis →</a></p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Tips Panel -->
+    <div class="section-card">
+      <div class="section-head">
+        <h3><i class="fa fa-lightbulb" style="margin-right:8px;color:var(--warning)"></i>Interview Tips</h3>
+      </div>
+
+      <div class="tip-item">
+        <div class="tip-icon">🎯</div>
+        <div>
+          <div class="tip-title">Tailor your resume</div>
+          <div class="tip-text">Mirror the exact keywords from the job description to score higher on ATS and our analyzer.</div>
+        </div>
+      </div>
+      <div class="tip-item">
+        <div class="tip-icon">⭐</div>
+        <div>
+          <div class="tip-title">Use the STAR method</div>
+          <div class="tip-text">For behavioral questions: Situation, Task, Action, Result. Keep answers under 2 minutes.</div>
+        </div>
+      </div>
+      <div class="tip-item">
+        <div class="tip-icon">📹</div>
+        <div>
+          <div class="tip-title">Enable the camera</div>
+          <div class="tip-text">Practicing with your camera on builds confidence and simulates a real interview environment.</div>
+        </div>
+      </div>
+      <div class="tip-item">
+        <div class="tip-icon">🔁</div>
+        <div>
+          <div class="tip-title">Practice repeatedly</div>
+          <div class="tip-text">Studies show 3+ mock sessions significantly increase success rates. Use history to track progress.</div>
+        </div>
+      </div>
+      <div class="tip-item">
+        <div class="tip-icon">📚</div>
+        <div>
+          <div class="tip-title">Fill your skill gaps</div>
+          <div class="tip-text">The skill gap analysis tells you exactly what to study. Use free resources like Coursera or docs.</div>
+        </div>
+      </div>
+
+      <div style="padding:1rem 1.5rem;">
+        <a href="{{ url_for('index') }}" class="btn btn-primary" style="width:100%;justify-content:center;">
+          <i class="fa fa-wand-magic-sparkles"></i> Start New Analysis
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
